@@ -21,29 +21,55 @@
       margin: 1rem 0;
       color: #00ff88;
     }
-    button {
+    .btn {
       padding: 1rem 2rem;
       font-size: 1.2rem;
-      margin-top: 2rem;
+      margin: 1rem;
       background: #00ff88;
       color: #000;
       border: none;
       border-radius: 10px;
       cursor: pointer;
     }
+    #status {
+      font-size: 1rem;
+      margin-top: 1rem;
+    }
+    .active {
+      color: #00ff88;
+    }
+    .inactive {
+      color: #ff4444;
+    }
   </style>
 </head>
 <body>
   <h1>Ping Pong Hit Counter</h1>
   <div id="counter">0</div>
-  <button onclick="startListening()">Start Counting</button>
+
+  <button class="btn" onclick="startListening()">Start Counting</button>
+  <button class="btn" onclick="resetCounter()">Reset Counter</button>
+
+  <div id="status" class="inactive">Status: Not Listening</div>
 
   <script>
     let hitCount = 0;
     const counterEl = document.getElementById('counter');
+    const statusEl = document.getElementById('status');
     let lastHitTime = 0;
+    let isListening = false;
+
+    function resetCounter() {
+      hitCount = 0;
+      counterEl.textContent = hitCount;
+    }
 
     function startListening() {
+      if (isListening) return; // Don't start twice
+      isListening = true;
+      statusEl.textContent = 'Status: Listening...';
+      statusEl.className = 'active';
+
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
           const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -77,6 +103,9 @@
         })
         .catch(err => {
           alert('Microphone access is required.');
+          statusEl.textContent = 'Status: Mic Access Denied';
+          statusEl.className = 'inactive';
+          isListening = false;
           console.error(err);
         });
     }
