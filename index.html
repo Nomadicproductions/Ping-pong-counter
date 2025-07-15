@@ -11,6 +11,7 @@
       color: #fff;
       text-align: center;
       padding: 2rem;
+      margin: 0;
     }
     h1 {
       font-size: 2.5rem;
@@ -20,17 +21,28 @@
       font-size: 5rem;
       margin: 1rem 0;
       color: #00ff88;
+      transition: box-shadow 0.15s, background 0.15s;
+      border-radius: 20px;
+      background: #1a1a1a;
+      display: inline-block;
+      min-width: 180px;
+    }
+    .flash {
+      box-shadow: 0 0 40px #00ff88, 0 0 10px #fff;
+      background: #1a3f2a;
     }
     .btn {
       padding: 1rem 2rem;
       font-size: 1.2rem;
-      margin: 1rem;
+      margin: 1rem 0.5rem 1rem 0.5rem;
       background: #00ff88;
       color: #000;
       border: none;
       border-radius: 10px;
       cursor: pointer;
       transition: background 0.2s;
+      display: inline-block;
+      min-width: 120px;
     }
     .btn:active {
       background: #00cc66;
@@ -70,16 +82,47 @@
       padding: 0.3rem 0;
       font-size: 1.1rem;
     }
+    #sensitivity-container {
+      margin-top: 2rem;
+      margin-bottom: 1.5rem;
+      background: #232323;
+      border-radius: 10px;
+      display: inline-block;
+      padding: 1rem 2rem;
+    }
+    #sensitivity-label {
+      color: #00ff88;
+      font-size: 1.05rem;
+      margin-right: 10px;
+    }
+    input[type=range] {
+      width: 160px;
+      margin: 0 8px;
+      accent-color: #00ff88;
+    }
+    @media (max-width: 600px) {
+      #counter { font-size: 3rem; min-width: 110px; }
+      .btn { font-size: 1rem; padding: 0.6rem 1rem; min-width: 90px; }
+      #history, #sensitivity-container { max-width: 97vw; padding: 0.8rem; }
+    }
   </style>
 </head>
 <body>
   <h1>Ping Pong Hit Counter</h1>
   <div id="counter">0</div>
 
-  <button class="btn" onclick="startListening()">Start Counting</button>
-  <button class="btn" onclick="stopListening()">Stop Listening</button>
-  <button class="btn" onclick="saveScore()">Save Score</button>
-  <button class="btn" onclick="resetCounter()">Reset Counter</button>
+  <div id="sensitivity-container">
+    <span id="sensitivity-label">Sensitivity:</span>
+    <input type="range" id="sensitivitySlider" min="20" max="80" value="40">
+    <span id="sensitivityValue">40</span>
+  </div>
+
+  <div>
+    <button class="btn" onclick="startListening()">Start Counting</button>
+    <button class="btn" onclick="stopListening()">Stop Listening</button>
+    <button class="btn" onclick="saveScore()">Save Score</button>
+    <button class="btn" onclick="resetCounter()">Reset Counter</button>
+  </div>
 
   <div id="status" class="inactive">Status: Not Listening</div>
 
@@ -87,6 +130,8 @@
     <h2>Score History</h2>
     <ul id="historyList"></ul>
   </div>
+
+  <audio id="beep" src="" preload="auto"></audio>
 
   <script>
     let hitCount = 0;
@@ -97,6 +142,41 @@
     let audioContext = null;
     let mediaStream = null;
     let rafId = null;
+    let hitThreshold = 40;
+
+    // --- Sensitivity slider logic ---
+    const sensitivitySlider = document.getElementById('sensitivitySlider');
+    const sensitivityValue = document.getElementById('sensitivityValue');
+    sensitivitySlider.addEventListener('input', function() {
+      hitThreshold = parseInt(this.value, 10);
+      sensitivityValue.textContent = hitThreshold;
+    });
+
+    // --- Beep sound on hit ---
+    function playBeep() {
+      // Web Audio API beep (short sine wave blip)
+      try {
+        const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.value = 0.25;
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start();
+        o.stop(ctx.currentTime + 0.10);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.10);
+      } catch (e) {
+        // If AudioContext is closed, skip beep
+      }
+    }
+
+    // --- Counter flash animation ---
+    function flashCounter() {
+      counterEl.classList.add('flash');
+      setTimeout(() => counterEl.classList.remove('flash'), 120);
+    }
 
     // --- Hit detection logic ---
     function resetCounter() {
@@ -131,9 +211,11 @@
             }
 
             const now = Date.now();
-            if (maxVolume > 40 && now - lastHitTime > 300) {
+            if (maxVolume > hitThreshold && now - lastHitTime > 300) {
               hitCount++;
               counterEl.textContent = hitCount;
+              flashCounter();
+              playBeep();
               lastHitTime = now;
             }
 
@@ -205,11 +287,12 @@
       });
     }
 
-    // --- On page load, show history ---
+    // --- On page load, show history and sensitivity ---
     displayHistory();
+    sensitivityValue.textContent = hitThreshold;
 
-    // --- Optional: save history on page unload (if needed) ---
-    // window.addEventListener('beforeunload', saveScore);
+    // Optional: Clean up when user leaves the page
+    window.addEventListener('beforeunload', stopListening);
   </script>
 </body>
 </html>
