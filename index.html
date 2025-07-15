@@ -1,1 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ping Pong Hit Counter</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #121212;
+      color: #fff;
+      text-align: center;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    #counter {
+      font-size: 5rem;
+      margin: 1rem 0;
+      color: #00ff88;
+    }
+    button {
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      margin-top: 2rem;
+      background: #00ff88;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ping Pong Hit Counter</h1>
+  <div id="counter">0</div>
+  <button onclick="startListening()">Start Counting</button>
 
+  <script>
+    let hitCount = 0;
+    const counterEl = document.getElementById('counter');
+    let lastHitTime = 0;
+
+    function startListening() {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 512;
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          source.connect(analyser);
+
+          function detectHits() {
+            analyser.getByteTimeDomainData(dataArray);
+            let maxVolume = 0;
+
+            for (let i = 0; i < dataArray.length; i++) {
+              const volume = Math.abs(dataArray[i] - 128);
+              if (volume > maxVolume) maxVolume = volume;
+            }
+
+            const now = Date.now();
+            if (maxVolume > 40 && now - lastHitTime > 300) {
+              hitCount++;
+              counterEl.textContent = hitCount;
+              lastHitTime = now;
+            }
+
+            requestAnimationFrame(detectHits);
+          }
+
+          detectHits();
+        })
+        .catch(err => {
+          alert('Microphone access is required.');
+          console.error(err);
+        });
+    }
+  </script>
+</body>
+</html>
