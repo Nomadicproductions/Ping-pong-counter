@@ -30,6 +30,10 @@
       border: none;
       border-radius: 10px;
       cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:active {
+      background: #00cc66;
     }
     #status {
       font-size: 1rem;
@@ -41,6 +45,31 @@
     .inactive {
       color: #ff4444;
     }
+    #history {
+      margin-top: 2rem;
+      text-align: left;
+      max-width: 350px;
+      margin-left: auto;
+      margin-right: auto;
+      background: #232323;
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    #history h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      color: #00ff88;
+    }
+    #history ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    #history li {
+      border-bottom: 1px solid #222;
+      padding: 0.3rem 0;
+      font-size: 1.1rem;
+    }
   </style>
 </head>
 <body>
@@ -48,9 +77,16 @@
   <div id="counter">0</div>
 
   <button class="btn" onclick="startListening()">Start Counting</button>
+  <button class="btn" onclick="stopListening()">Stop Listening</button>
+  <button class="btn" onclick="saveScore()">Save Score</button>
   <button class="btn" onclick="resetCounter()">Reset Counter</button>
 
   <div id="status" class="inactive">Status: Not Listening</div>
+
+  <div id="history">
+    <h2>Score History</h2>
+    <ul id="historyList"></ul>
+  </div>
 
   <script>
     let hitCount = 0;
@@ -58,7 +94,11 @@
     const statusEl = document.getElementById('status');
     let lastHitTime = 0;
     let isListening = false;
+    let audioContext = null;
+    let mediaStream = null;
+    let rafId = null;
 
+    // --- Hit detection logic ---
     function resetCounter() {
       hitCount = 0;
       counterEl.textContent = hitCount;
@@ -72,7 +112,8 @@
 
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
-          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          mediaStream = stream;
           const source = audioContext.createMediaStreamSource(stream);
           const analyser = audioContext.createAnalyser();
           analyser.fftSize = 512;
@@ -96,7 +137,7 @@
               lastHitTime = now;
             }
 
-            requestAnimationFrame(detectHits);
+            rafId = requestAnimationFrame(detectHits);
           }
 
           detectHits();
@@ -109,6 +150,66 @@
           console.error(err);
         });
     }
+
+    function stopListening() {
+      if (!isListening) return;
+      isListening = false;
+      statusEl.textContent = 'Status: Not Listening';
+      statusEl.className = 'inactive';
+
+      // Stop audio context and media stream
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+    }
+
+    // --- Score history logic ---
+    function saveScore() {
+      if (hitCount === 0) {
+        alert('No hits to save!');
+        return;
+      }
+      const now = new Date();
+      const entry = {
+        score: hitCount,
+        date: now.toLocaleString()
+      };
+      let history = JSON.parse(localStorage.getItem('pingpong_scores') || '[]');
+      history.unshift(entry); // Add to the top
+      localStorage.setItem('pingpong_scores', JSON.stringify(history));
+      displayHistory();
+      resetCounter();
+    }
+
+    function displayHistory() {
+      let history = JSON.parse(localStorage.getItem('pingpong_scores') || '[]');
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+      if (history.length === 0) {
+        historyList.innerHTML = '<li>No scores saved yet.</li>';
+        return;
+      }
+      history.forEach(entry => {
+        const li = document.createElement('li');
+        li.textContent = `${entry.score} hits (${entry.date})`;
+        historyList.appendChild(li);
+      });
+    }
+
+    // --- On page load, show history ---
+    displayHistory();
+
+    // --- Optional: save history on page unload (if needed) ---
+    // window.addEventListener('beforeunload', saveScore);
   </script>
 </body>
 </html>
